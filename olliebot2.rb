@@ -1,3 +1,12 @@
+# Olliebot2
+# The bot itself has basically not functionality. All functionality is handled
+# in plugins. See https://github.com/brpeterman/olliebot2-plugins for examples.
+# 
+# To use:
+# Create a new Olliebot2 instance and call #connect.
+# Plugins may be updated while the bot is running. If you make a modification
+# or add a new plugin, just call #reload_plugins.
+
 require '../ruby-irc/irc-connection.rb'
 require 'rubygems'
 
@@ -42,13 +51,20 @@ class Olliebot2
   #private
   
   def load_plugins(reload=false)
-    @plugins = {}
+    @plugins = []
     Dir.glob 'plugins/*.plugin.rb' do |filename|
       begin
         filename =~ /plugins\/(.+?)\.plugin\.rb/
         module_name = $1
         if reload then
-          Object.send(:remove_const, module_name.to_sym)
+          begin
+            module_ref = Object.const_get module_name
+            module_ref.constants(false).each do |const|
+              module_ref.send(:remove_const, const)
+            end
+            Object.send(:remove_const, module_name)
+          rescue NameError
+          end
         end
         load filename
         module_ref = Object.const_get module_name
@@ -79,12 +95,14 @@ class Olliebot2
   end
   
   def handle_event(event)
-    #$stderr.puts event.command + ' ' + event.params.join(' ')
     method = ("handle_" + event.command).to_sym
-    @plugins.keys.reverse.each do |priority|
-      @plugins[priority].each do |plugin|
-        if plugin.respond_to? method then
-          plugin.send(method, event)
+    # Call plugins by highest priority to lowest
+    @plugins.reverse.each do |priority|
+      if priority then
+        priority.each do |plugin|
+          if plugin.respond_to? method then
+            plugin.send(method, event)
+          end
         end
       end
     end
