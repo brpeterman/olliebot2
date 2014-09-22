@@ -52,6 +52,7 @@ class Olliebot2
   
   def load_plugins(reload=false)
     @plugins = []
+    @loaded_plugins = {}
     Dir.glob 'plugins/*.plugin.rb' do |filename|
       begin
         filename =~ /plugins\/(.+?)\.plugin\.rb/
@@ -72,7 +73,9 @@ class Olliebot2
         if !@plugins[priority] then
           @plugins[priority] = []
         end
-        @plugins[priority] << module_ref.const_get("Plugin").new(self)
+        plugin = module_ref.const_get("Plugin").new(self)
+        @plugins[priority] << plugin
+        @loaded_plugins[module_ref] = plugin
       rescue => exception
         $stderr.puts "Failed to load " + filename
         $stderr.puts exception.inspect
@@ -107,5 +110,21 @@ class Olliebot2
       end
     end
     true
+  end
+  
+  def plugin_loaded?(mod)
+    if @loaded_plugins[mod] then
+      true
+    else
+      false
+    end
+  end
+  
+  def call_on_plugin(mod, method, *args)
+    if @loaded_plugins[mod] then
+      @loaded_plugins[mod].send(method, args[0])
+    else
+      nil
+    end
   end
 end
